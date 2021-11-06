@@ -6,11 +6,15 @@ import seaborn as sns
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 from openpyxl.utils.dataframe import dataframe_to_rows
+import plotly.graph_objects as go
+import scipy.stats as stats
 
 
 def display_dist(df, label):
     # TODO: separate label from title argument to allow customization
     """takes a df and a column label and graphs the distribution (continuous) for display"""
+
+    # TODO: ensure the height of the box plot is correct
 
     sns.set(style="white", palette="pastel")
     fig, axes = plt.subplots(2, 1, figsize=(6, 6))
@@ -72,7 +76,7 @@ def file_to_df(location):
     setting_cat = pd.api.types.CategoricalDtype(categories=['Acute care', 'ICU'], ordered=True)
     discharge_o2_cat = pd.api.types.CategoricalDtype(categories=['N/A', 'No', 'Yes'], ordered=True)
     acp_surr_cat = pd.api.types.CategoricalDtype(categories=['Unknown', 'POLST', 'Surrogate', 'Patient'], ordered=True)
-    code_cat = pd.api.types.CategoricalDtype(categories=['Full code', 'DNR', 'DNR/DNI'], ordered=True)
+    code_cat = pd.api.types.CategoricalDtype(categories=['Unknown', 'Full code', 'DNR', 'DNR/DNI'], ordered=True)
 
     # convert data types
     db['Age'] = db['Age'].astype('int')
@@ -87,13 +91,16 @@ def file_to_df(location):
     db['LOS'] = db['LOS'].astype('int')
     # db['Admit']
     # db['Discharge']
+
+    # -- Advanced care planning
     db['Palliative Consult'] = db['Palliative Consult'].astype(palliative_cat)
     db['CCI'] = db['CCI'].astype('int')
     db['Prior ACP type'] = db['Prior ACP type'].astype(p_acp_cat)
     db['Prior Decision Maker'] = db['Prior Decision Maker'].replace({"N": "No", "Y": "Yes", None: "Yes"})\
         .astype(acp_surr_cat)
     # db['Date of prior ACP']
-    db['Prior Code status'] = db['Prior Code status'].astype(code_cat)
+    db['Prior Code status'] = db['Prior Code status'].replace(
+        {None: "Unknown"}).astype(code_cat)
     db['Prior limitations on artificial nutrition'] = db['Prior limitations on artificial nutrition'].replace(
         {"X": "Yes", None: "No"}).astype('category')
     db['Prior limitations on intubation'] = db['Prior limitations on intubation'].replace(
@@ -125,6 +132,57 @@ def file_to_df(location):
     # Decision Maker Subsequent
     # Change to more or less agreesive measures Subsequent
     # TODO: figure how to do a 'last' code status
+
+    # TODO: do columns for symptom onset, test date, admit date
+
+    # ---Symptoms----
+    db['Symptoms prior to admit'] = db['Symptoms prior to admit'].astype('category')
+    db['Fever'] = db['Fever'].replace({'X':'Yes', None:'No'}).astype('category')
+    db['SOB'] = db['SOB'].replace({'X':'Yes', None:'No'}).astype('category')
+    db['Cough'] = db['Cough'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['Sinus Congestion'] = db['Sinus Congestion'].replace({'X':'Yes', None:'No'}).astype('category')
+    db['Malaise or Fatigue or Weakness'] = db['Malaise or Fatigue or Weakness'].replace({'X':'Yes', None:'No'}).astype('category')
+    db['Diarrhea'] = db['Diarrhea'].replace({'X':'Yes', None:'No'}).astype('category')
+    db['Confusion'] = db['Confusion'].replace({'X':'Yes', None:'No'}).astype('category')
+    db['Anorexia'] = db['Anorexia'].replace({'X':'Yes', None:'No'}).astype('category')
+    db['Myalgias Athralgias'] = db['Myalgias Athralgias'].replace({'X':'Yes', None:'No'}).astype('category')
+    db['HA'] = db['HA'].replace({'X':'Yes', None:'No'}).astype('category')
+    db['Sore throat'] = db['Sore throat'].replace({'X':'Yes', None:'No'}).astype('category')
+    db['Abdominal pain'] = db['Abdominal pain'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['SIRS criteria met on admission'] = db['SIRS criteria met on admission'].replace({'Y': 'Yes', "N": 'No'}).astype('category')
+
+    # ---Admission Signs----
+    db['Temp'] = db['Temp'].astype('float')
+    db['SBP'] = db['SBP'].astype('float')
+    db['DBP'] = db['DBP'].astype('float')
+    db['Pulse'] = db['Pulse'].astype('float')
+    db['RR'] = db['RR'].astype('float')
+    db['O2'] = db['O2'].astype('float')
+    db['WBC'] = db['WBC'].astype('float')
+    db['SIRS criteria met'] = db['SIRS criteria met'].astype('int')
+    db['Supp O2'] = db['Supp O2'].astype('int')
+
+    #db['Days after admit test positive'] = db['Date of + test'] - db['Admit']
+    db['Days after admit test positive'] = db.apply(calc_time_diff_days, axis=1, args=('Date of + test', 'Admit'))
+
+    # ---Comorbidities----
+    db['MI'] = db['MI'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['CHF'] = db['CHF'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['PVD'] = db['PVD'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['CVA or TIA'] = db['CVA or TIA'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['Dementia'] = db['Dementia'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['COPD'] = db['COPD'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['Connective tissue disease'] = db['Connective tissue disease'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['PUD'] = db['PUD'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['Liver disease'] = db['Liver disease'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['DM'] = db['DM'].replace({'Complicated': 'Yes/Complicated', 'Uncomplicated': 'Yes/Uncomplicated', None: 'No'}).astype('category')
+    db['Mod-Sev CKD'] = db['Mod-Sev CKD'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['Solid tumor'] = db['Solid tumor'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['Leukemia'] = db['Leukemia'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['Lymphoma'] = db['Lymphoma'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['AIDS'] = db['AIDS'].replace({'X': 'Yes', None: 'No'}).astype('category')
+    db['Hemiplegia'] = db['Hemiplegia'].replace({'X': 'Yes', None: 'No'}).astype('category')
+
     return db
 
 
@@ -195,13 +253,85 @@ def make_tables(db):
     demo_row_labels.append("")
     demographics.append(("", "", ""))
 
+    # COMORBIDITIES
+    demo_row_labels.append('COMORBIDITIES')
+    demographics.append(("", "", ""))
     # CCI
-    demo_row_labels.append('CHARLSON\nCOMORBIDITY\nINDEX')
+    demo_row_labels.append('TOTAL CHARLSON\nCOMORBIDITY INDEX')
     demographics.append(
         (iqr_string(db['CCI'].describe()),
          iqr_string(patient_dec_db['CCI'].describe()),
          iqr_string(surr_dec_db['CCI'].describe()))
     )
+
+    demo_row_labels.append('CAD')
+    demographics.append(("", "", ""))
+    for cad in db['MI'].value_counts().keys():
+        demo_row_labels.append(cad)
+        demographics.append((count_string_indiv(db['MI'].value_counts()[cad], num_total),
+                             count_string_indiv(patient_dec_db['MI'].value_counts(dropna=False)[cad], num_patient_dec),
+                             count_string_indiv(surr_dec_db['MI'].value_counts(dropna=False)[cad], num_surr_dec)))
+    demo_row_labels.append("")
+    demographics.append(("", "", ""))
+
+    demo_row_labels.append('CHF')
+    demographics.append(("", "", ""))
+    for chf in db['CHF'].value_counts().keys():
+        demo_row_labels.append(chf)
+        demographics.append((count_string_indiv(db['CHF'].value_counts()[chf], num_total),
+                             count_string_indiv(patient_dec_db['CHF'].value_counts(dropna=False)[chf], num_patient_dec),
+                             count_string_indiv(surr_dec_db['CHF'].value_counts(dropna=False)[chf], num_surr_dec)))
+    demo_row_labels.append("")
+    demographics.append(("", "", ""))
+
+    #'PVD'
+
+    demo_row_labels.append('CVA or TIA')
+    demographics.append(("", "", ""))
+    for cva in db['CVA or TIA'].value_counts().keys():
+        demo_row_labels.append(cva)
+        demographics.append((count_string_indiv(db['CVA or TIA'].value_counts()[cva], num_total),
+                             count_string_indiv(patient_dec_db['CVA or TIA'].value_counts(dropna=False)[cva], num_patient_dec),
+                             count_string_indiv(surr_dec_db['CVA or TIA'].value_counts(dropna=False)[cva], num_surr_dec)))
+    demo_row_labels.append("")
+    demographics.append(("", "", ""))
+
+    demo_row_labels.append('Dementia')
+    demographics.append(("", "", ""))
+    for dem in db['Dementia'].value_counts().keys():
+        demo_row_labels.append(dem)
+        demographics.append((count_string_indiv(db['Dementia'].value_counts()[dem], num_total),
+                             count_string_indiv(patient_dec_db['Dementia'].value_counts(dropna=False)[dem],
+                                                num_patient_dec),
+                             count_string_indiv(surr_dec_db['Dementia'].value_counts(dropna=False)[dem],
+                                                num_surr_dec)))
+    demo_row_labels.append("")
+    demographics.append(("", "", ""))
+
+    #'COPD'
+    #'Connective tissue disease'
+    #'PUD'
+    #'Liver disease'
+
+    demo_row_labels.append('DM')
+    demographics.append(("", "", ""))
+    for dm in db['DM'].value_counts().keys():
+        demo_row_labels.append(dm)
+        demographics.append((count_string_indiv(db['DM'].value_counts()[dm], num_total),
+                             count_string_indiv(patient_dec_db['DM'].value_counts(dropna=False)[dm],
+                                                num_patient_dec),
+                             count_string_indiv(surr_dec_db['DM'].value_counts(dropna=False)[dm],
+                                                num_surr_dec)))
+    demo_row_labels.append("")
+    demographics.append(("", "", ""))
+
+    #'Mod-Sev CKD'
+    #'Solid tumor'
+    #'Leukemia'
+    #'Lymphoma'
+    #'AIDS'
+    #'Hemiplegia'
+
     demo_row_labels.append("")
     demographics.append(("", "", ""))
 
@@ -269,7 +399,226 @@ def make_tables(db):
         cell.alignment = Alignment(wrapText=True, vertical='center', horizontal='center')
 
     # -------------------------
-    # Table 2 - Hospitalization
+    # Table 2 - Presentation
+    column_labels = ['All Patients\n(n=' + str(num_total) + ')',
+                     'Decision-maker: Patient\n(n=' + str(num_patient_dec) + ')',
+                     'Decision-maker: Surrogate\n(n=' + str(num_surr_dec) + ')']
+    pres_row_labels = []
+    presentation = []
+
+    pres_row_labels.append('DAYS AFTER ADMIT COVID+ TEST')
+    presentation.append((iqr_string(db['Days after admit test positive'].describe()),
+         iqr_string(patient_dec_db['Days after admit test positive'].describe()),
+         iqr_string(surr_dec_db['Days after admit test positive'].describe())))
+
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('SYMPTOMS PRIOR TO ADMIT?')
+    presentation.append(("", "", ""))
+    for x in db['Symptoms prior to admit'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Symptoms prior to admit'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Symptoms prior to admit'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Symptoms prior to admit'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    # ---Symptoms----
+    pres_row_labels.append('SYMPTOMS AT PRESENTATION')
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Fever')
+    presentation.append(("", "", ""))
+    for x in db['Fever'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Fever'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Fever'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Fever'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Shortness of Breath')
+    presentation.append(("", "", ""))
+    for x in db['SOB'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['SOB'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['SOB'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['SOB'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Cough')
+    presentation.append(("", "", ""))
+    for x in db['Cough'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Cough'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Cough'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Cough'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Sinus Congestion')
+    presentation.append(("", "", ""))
+    for x in db['Sinus Congestion'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Sinus Congestion'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Sinus Congestion'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Sinus Congestion'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Malaise or Fatigue or Weakness')
+    presentation.append(("", "", ""))
+    for x in db['Malaise or Fatigue or Weakness'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Malaise or Fatigue or Weakness'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Malaise or Fatigue or Weakness'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Malaise or Fatigue or Weakness'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Diarrhea')
+    presentation.append(("", "", ""))
+    for x in db['Diarrhea'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Diarrhea'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Diarrhea'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Diarrhea'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Confusion')
+    presentation.append(("", "", ""))
+    for x in db['Confusion'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Confusion'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Confusion'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Confusion'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Anorexia')
+    presentation.append(("", "", ""))
+    for x in db['Anorexia'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Anorexia'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Anorexia'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Anorexia'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Myalgias Athralgias')
+    presentation.append(("", "", ""))
+    for x in db['Myalgias Athralgias'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Myalgias Athralgias'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Myalgias Athralgias'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Myalgias Athralgias'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('HA')
+    presentation.append(("", "", ""))
+    for x in db['HA'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['HA'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['HA'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['HA'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Sore throat')
+    presentation.append(("", "", ""))
+    for x in db['Sore throat'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Sore throat'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Sore throat'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Sore throat'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Abdominal pain')
+    presentation.append(("", "", ""))
+    for x in db['Abdominal pain'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['Abdominal pain'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['Abdominal pain'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['Abdominal pain'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    # ---Admission Signs----
+    pres_row_labels.append('SIGNS AT PRESENTATION')
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('2+ SIRS criteria met on admission')
+    presentation.append(("", "", ""))
+    for x in db['SIRS criteria met on admission'].value_counts().keys():
+        pres_row_labels.append(x)
+        presentation.append((count_string_indiv(db['SIRS criteria met on admission'].value_counts()[x], num_total),
+                             count_string_indiv(patient_dec_db['SIRS criteria met on admission'].value_counts(dropna=False)[x], num_patient_dec),
+                             count_string_indiv(surr_dec_db['SIRS criteria met on admission'].value_counts(dropna=False)[x], num_surr_dec)))
+    pres_row_labels.append("")
+    presentation.append(("", "", ""))
+
+    pres_row_labels.append('Number of SIRS criteria met')
+    presentation.append((iqr_string(db['SIRS criteria met'].describe()),
+         iqr_string(patient_dec_db['SIRS criteria met'].describe()),
+         iqr_string(surr_dec_db['SIRS criteria met'].describe())))
+
+    pres_row_labels.append('Temperature')
+    presentation.append((std_string(db['Temp'].describe()),
+         std_string(patient_dec_db['Temp'].describe()),
+         std_string(surr_dec_db['Temp'].describe())))
+
+    pres_row_labels.append('SBP')
+    presentation.append((std_string(db['SBP'].describe()),
+         std_string(patient_dec_db['SBP'].describe()),
+         std_string(surr_dec_db['SBP'].describe())))
+
+    pres_row_labels.append('DBP')
+    presentation.append((std_string(db['DBP'].describe()),
+         std_string(patient_dec_db['DBP'].describe()),
+         std_string(surr_dec_db['DBP'].describe())))
+
+    pres_row_labels.append('Pulse')
+    presentation.append((std_string(db['Pulse'].describe()),
+         std_string(patient_dec_db['Pulse'].describe()),
+         std_string(surr_dec_db['Pulse'].describe())))
+
+    pres_row_labels.append('Respiratory Rate')
+    presentation.append((std_string(db['RR'].describe()),
+         std_string(patient_dec_db['RR'].describe()),
+         std_string(surr_dec_db['RR'].describe())))
+
+    pres_row_labels.append('SpO2')
+    presentation.append((std_string(db['O2'].describe()),
+         std_string(patient_dec_db['O2'].describe()),
+         std_string(surr_dec_db['O2'].describe())))
+
+    pres_row_labels.append('Supplemental O2 (L/min)')
+    presentation.append((iqr_string(db['Supp O2'].describe()),
+         iqr_string(patient_dec_db['Supp O2'].describe()),
+         iqr_string(surr_dec_db['Supp O2'].describe())))
+
+    pres_row_labels.append('WBC')
+    presentation.append((std_string(db['WBC'].describe()),
+         std_string(patient_dec_db['WBC'].describe()),
+         std_string(surr_dec_db['WBC'].describe())))
+
+    presentation_df = pd.DataFrame(presentation, columns=column_labels, index=pres_row_labels)
+    presentation_worksheet = workbook.create_sheet(title="Presentation", index=1)
+
+    for r in dataframe_to_rows(presentation_df, index=True, header=True):
+        presentation_worksheet.append(r)
+
+    for cell in presentation_worksheet['A'] + presentation_worksheet[1]:
+        cell.style = 'Pandas'
+        cell.alignment = Alignment(wrapText=True, vertical='center')
+
+    # -------------------------
+    # Table 3 - Hospitalization  / Outcome
 
     column_labels = ['All Patients\n(n=' + str(num_total) + ')',
                      'Decision-maker: Patient\n(n=' + str(num_patient_dec) + ')',
@@ -278,7 +627,7 @@ def make_tables(db):
     hospitalization = []
 
     # 'Setting'
-    hosp_row_labels.append('SETTING')
+    hosp_row_labels.append('MAXIMAL CARE SETTING')
     hospitalization.append(("", "", ""))
     for x in db['Setting'].value_counts().keys():
         hosp_row_labels.append(x)
@@ -290,7 +639,7 @@ def make_tables(db):
     hospitalization.append(("", "", ""))
 
     # 'Oxygen Delivery'
-    hosp_row_labels.append('OXYGEN DELIVERY')
+    hosp_row_labels.append('MAXIMAL OXYGEN DELIVERY MODE')
     hospitalization.append(("", "", ""))
     for x in db['Oxygen Delivery'].value_counts().keys():
         hosp_row_labels.append(x)
@@ -456,7 +805,7 @@ def make_tables(db):
     hospitalization.append(("", "", ""))
 
     hospitalization_df = pd.DataFrame(hospitalization, columns=column_labels, index=hosp_row_labels)
-    hospitalization_worksheet = workbook.create_sheet(title="Hospitalization", index=1)
+    hospitalization_worksheet = workbook.create_sheet(title="Hospitalization and Course", index=2)
 
     for r in dataframe_to_rows(hospitalization_df, index=True, header=True):
         hospitalization_worksheet.append(r)
@@ -509,6 +858,181 @@ def count_string_indiv(num, num_patients):
     return output
 
 
+# TODO: Add yes/no string
+
+
+def calc_time_diff_days(row, date1, date2):
+    """take a row and 2 dates and calculate the difference in time between date 1 and date 2 expressed in days
+    must take columns (date1) and (date2) that contain datetime objects"""
+    diff = row[date1] - row[date2]
+    return diff.days
+
+
+def statistical_tests(df):
+    """limited statistical tests comparing groups of: needing surrogate vs not"""
+
+    patient_dec_df = df.loc[df['Current Decision Maker'] == 'Patient']
+    surr_dec_df = df.loc[df['Current Decision Maker'] != 'Patient']
+
+    num_total = len(df.index)
+    num_patient_dec = len(patient_dec_df)
+    num_surr_dec = len(surr_dec_df)
+
+    print("\nAge")
+    print(stats.ttest_ind(patient_dec_df['Age'], surr_dec_df['Age']))
+    print("\nGender")
+    print([patient_dec_df['Gender'].value_counts(), surr_dec_df['Gender'].value_counts()])
+    print(stats.fisher_exact([patient_dec_df['Gender'].value_counts(), surr_dec_df['Gender'].value_counts()]))
+    #Note: ethnicity required Fisher-Freemon-Halton r x c generalization of exact test
+    print("\nBMI")
+    print(stats.ttest_ind(patient_dec_df['BMI'], surr_dec_df['BMI']))
+    print("\nCCI")
+    print(stats.ttest_ind(patient_dec_df['CCI'], surr_dec_df['CCI']))
+    print("\nCAD")
+    print([patient_dec_df['MI'].value_counts(sort=False), surr_dec_df['MI'].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df['MI'].value_counts(sort=False), surr_dec_df['MI'].value_counts(sort=False)]))
+    print("\nCHF")
+    print([patient_dec_df['CHF'].value_counts(sort=False), surr_dec_df['CHF'].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df['CHF'].value_counts(sort=False), surr_dec_df['CHF'].value_counts(sort=False)]))
+    print("\nCVA or TIA")
+    print([patient_dec_df['CVA or TIA'].value_counts(sort=False), surr_dec_df['CVA or TIA'].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df['CVA or TIA'].value_counts(sort=False), surr_dec_df['CVA or TIA'].value_counts(sort=False)]))
+    print("\nDementia")
+    print([patient_dec_df['Dementia'].value_counts(sort=False), surr_dec_df['Dementia'].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df['Dementia'].value_counts(sort=False), surr_dec_df['Dementia'].value_counts(sort=False)]))
+    #DM done in stata
+    #Prior ACP done in stata
+    print("\nDays after admit pos")
+    print(stats.ttest_ind(patient_dec_df["Days after admit test positive"], surr_dec_df["Days after admit test positive"]))
+    print("Symptoms prior to admit")
+    print([patient_dec_df["Symptoms prior to admit"].value_counts(sort=False), surr_dec_df["Symptoms prior to admit"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Symptoms prior to admit"].value_counts(sort=False), surr_dec_df["Symptoms prior to admit"].value_counts(sort=False)]))
+    print("Fever")
+    print([patient_dec_df["Fever"].value_counts(sort=False),
+           surr_dec_df["Fever"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Fever"].value_counts(sort=False),
+                              surr_dec_df["Fever"].value_counts(sort=False)]))
+    print("SOB")
+    print([patient_dec_df["SOB"].value_counts(sort=False),
+           surr_dec_df["SOB"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["SOB"].value_counts(sort=False),
+                              surr_dec_df["SOB"].value_counts(sort=False)]))
+    print("Cough")
+    print([patient_dec_df["Cough"].value_counts(sort=False),
+           surr_dec_df["Cough"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Cough"].value_counts(sort=False),
+                              surr_dec_df["Cough"].value_counts(sort=False)]))
+    print("Sinus Congestion")
+    print([patient_dec_df["Sinus Congestion"].value_counts(sort=False),
+           surr_dec_df["Sinus Congestion"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Sinus Congestion"].value_counts(sort=False),
+                              surr_dec_df["Sinus Congestion"].value_counts(sort=False)]))
+    print("Malaise or Fatigue or Weakness")
+    print([patient_dec_df["Malaise or Fatigue or Weakness"].value_counts(sort=False),
+           surr_dec_df["Malaise or Fatigue or Weakness"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Malaise or Fatigue or Weakness"].value_counts(sort=False),
+                              surr_dec_df["Malaise or Fatigue or Weakness"].value_counts(sort=False)]))
+    print("Diarrhea")
+    print([patient_dec_df["Diarrhea"].value_counts(sort=False),
+           surr_dec_df["Diarrhea"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Diarrhea"].value_counts(sort=False),
+                              surr_dec_df["Diarrhea"].value_counts(sort=False)]))
+    print("Confusion")
+    print([patient_dec_df["Confusion"].value_counts(sort=False),
+           surr_dec_df["Confusion"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Confusion"].value_counts(sort=False),
+                              surr_dec_df["Confusion"].value_counts(sort=False)]))
+    print("Anorexia")
+    print([patient_dec_df["Anorexia"].value_counts(sort=False),
+           surr_dec_df["Anorexia"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Anorexia"].value_counts(sort=False),
+                              surr_dec_df["Anorexia"].value_counts(sort=False)]))
+    print("Myalgias Athralgias")
+    print([patient_dec_df["Myalgias Athralgias"].value_counts(sort=False),
+           surr_dec_df["Myalgias Athralgias"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Myalgias Athralgias"].value_counts(sort=False),
+                              surr_dec_df["Myalgias Athralgias"].value_counts(sort=False)]))
+    print("HA")
+    print([patient_dec_df["HA"].value_counts(sort=False),
+           surr_dec_df["HA"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["HA"].value_counts(sort=False),
+                              surr_dec_df["HA"].value_counts(sort=False)]))
+    #Skipped Sore throat and Abdominal pain
+    print("Sore throat")
+    print([patient_dec_df["Sore throat"].value_counts(sort=False),
+           surr_dec_df["Sore throat"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Sore throat"].value_counts(sort=False),
+                              surr_dec_df["Sore throat"].value_counts(sort=False)]))
+    print("Abdominal pain")
+    print([patient_dec_df["Abdominal pain"].value_counts(sort=False),
+           surr_dec_df["Abdominal pain"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["Abdominal pain"].value_counts(sort=False),
+                              surr_dec_df["Abdominal pain"].value_counts(sort=False)]))
+    print("SIRS criteria met on admission")
+    print([patient_dec_df["SIRS criteria met on admission"].value_counts(sort=False),
+           surr_dec_df["SIRS criteria met on admission"].value_counts(sort=False)])
+    print(stats.fisher_exact([patient_dec_df["SIRS criteria met on admission"].value_counts(sort=False),
+                              surr_dec_df["SIRS criteria met on admission"].value_counts(sort=False)]))
+    print("\nSIRS criteria met")
+    print(stats.ttest_ind(patient_dec_df["SIRS criteria met"], surr_dec_df["SIRS criteria met"]))
+    print("\nTemp")
+    print(stats.ttest_ind(patient_dec_df["Temp"], surr_dec_df["Temp"]))
+    print("\nSBP")
+    print(stats.ttest_ind(patient_dec_df["SBP"], surr_dec_df["SBP"]))
+    print("\nDBP")
+    print(stats.ttest_ind(patient_dec_df["DBP"], surr_dec_df["DBP"]))
+    print("\nPulse")
+    print(stats.ttest_ind(patient_dec_df["Pulse"], surr_dec_df["Pulse"]))
+    print("\nRR")
+    print(stats.ttest_ind(patient_dec_df["RR"], surr_dec_df["RR"]))
+    print("\nO2")
+    print(stats.ttest_ind(patient_dec_df["O2"], surr_dec_df["O2"]))
+    print("\nSupp O2")
+    print(stats.ttest_ind(patient_dec_df["Supp O2"], surr_dec_df["Supp O2"]))
+    print("\nWBC")
+    print(stats.ttest_ind(patient_dec_df["WBC"].dropna(), surr_dec_df["WBC"].dropna()))
+    print("\nLOS")
+    print(stats.ttest_ind(patient_dec_df["LOS"].dropna(), surr_dec_df["LOS"].dropna()))
+
+    return
+
+
+def code_status_alluvial(df):
+    """takes the df and creates a sankey diagram (alluvial - with time points oriented vertically) to show change in
+    code status at 3 time points:
+
+    NOTE: at the moment, manually generating the widths by filling in
+    TODO: automatically generate these
+    """
+    fig = go.Figure(data=[go.Sankey(
+        node = dict(
+          pad= 15,
+          thickness= 45,
+          line= dict(color = "black", width = 0.5),
+          label= ["Prior: Unknown\nn=3", "Prior: Full Code\nn=5", "Prior: DNR only\nn=3", "Prior: DNI/DNR\nn=14",
+                   "Admit: Full Code\nn=3", "Admit: DNR only\nn=1", "Admit: DNI/DNR\nn=21",
+                   "Discharge: Full Code\nn=4", "Discharge: DNR only\nn=0", "Discharge: DNI/DNR\nn=20", "Death in Hosp\nn=1",
+                   "Alive\nn=18", "Dead within 30d\nn=7"],
+          color= ['#CBB4D5', '#6C91C4', '#FEF3C7', '#EBBAB5', # #EBBAB5 = red, #FEF3C7 = yellow, #6C91C4 = blue
+                   '#6C91C4', '#FEF3C7', '#EBBAB5',
+                   '#6C91C4', '#FEF3C7', '#EBBAB5', '#808B96',
+                   '#EBE9E9', '#808B96']
+        ),
+        link = dict(
+            source=[0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10],
+            target=[4, 5, 6, 4, 5, 6, 4, 5, 6, 4, 5, 6, 7, 8, 9, 7, 8, 9, 7, 8, 9, 10, 11, 12, 11, 12, 11, 12, 11, 12],
+            value=[0, 0, 3, 2, 1, 2, 1, 0, 2, 0, 0, 14, 3, 0, 0, 0, 0, 1, 1, 0, 20, 1, 4, 0, 0, 0, 14, 7, 0, 1]
+        ),
+        arrangement='perpendicular',
+        ids = ['a', 'b', 'c', 'd',
+               'e', 'f', 'g',
+               'h', 'i', 'j', 'k', 'l']
+    )])
+
+    fig.update_layout(font_size=25)
+    fig.show()
+
+
 def visualizations(db):
     """takes the database, creates visualizations of the data"""
     display_dist(db, 'Age')
@@ -542,15 +1066,63 @@ def visualizations(db):
     display_cats(db, 'Direct of Change in code status on admit')
     display_cats(db, 'Subsequent changes during hospitalization')
 
+    display_cats(db, 'Symptoms prior to admit')
+    display_cats(db, 'Fever')
+    display_cats(db, 'SOB')
+    display_cats(db, 'Sinus Congestion')
+    display_cats(db, 'Malaise or Fatigue or Weakness')
+    display_cats(db, 'Diarrhea')
+    display_cats(db, 'Confusion')
+    display_cats(db, 'Anorexia')
+    display_cats(db, 'Myalgias Athralgias')
+    display_cats(db, 'HA')
+    display_cats(db, 'Sore throat')
+    display_cats(db, 'Abdominal pain')
+    display_cats(db, 'SIRS criteria met on admission')
+
+    display_dist(db, 'Temp')
+    display_dist(db, 'SBP')
+    display_dist(db, 'DBP')
+    display_dist(db, 'Pulse')
+    display_dist(db, 'RR')
+    display_dist(db, 'O2')
+    display_dist(db, 'WBC')
+    display_dist(db, 'SIRS criteria met')
+    display_dist(db, 'Supp O2')
+    display_dist(db, 'Age')
+    display_dist(db, 'Days after admit test positive')
+
+    display_cats(db, 'MI')
+    display_cats(db, 'CHF')
+    display_cats(db, 'PVD')
+    display_cats(db, 'CVA or TIA')
+    display_cats(db, 'Dementia')
+    display_cats(db, 'COPD')
+    display_cats(db, 'Connective tissue disease')
+    display_cats(db, 'PUD')
+    display_cats(db, 'Liver disease')
+    display_cats(db, 'DM')
+    display_cats(db, 'Mod-Sev CKD')
+    display_cats(db, 'Solid tumor')
+    display_cats(db, 'Leukemia')
+    display_cats(db, 'Lymphoma')
+    display_cats(db, 'AIDS')
+    display_cats(db, 'Hemiplegia')
+
 
 def main():
     db_loc = "/Users/reblocke/Box/Residency Personal Files/Scholarly Work/SVH COVID Outbreak/Database/WorkingDb.xls"
     db = file_to_df(db_loc)
+    statistical_tests(db)
     db.to_excel('output.xlsx')
+
     make_tables(db)
     visualizations(db)
+    code_status_alluvial(db)
 
     # Hypotheses? Statistical tests?
+
+
 
     # Difference of direction between aggressiveness of surrogate changes vs not
     # Likelihood of change whether patient or surrogate is making decision at time of admission.

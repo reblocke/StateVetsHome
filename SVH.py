@@ -1,5 +1,11 @@
-# Support Functions for analyzing the state vets home outbreak
+"""Legacy analysis for a state veterans home COVID goals-of-care cohort."""
 
+import argparse
+from contextlib import redirect_stdout
+from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -10,7 +16,11 @@ import plotly.graph_objects as go
 import scipy.stats as stats
 
 
-def display_dist(df, label):
+DEFAULT_INPUT = Path("data/private/WorkingDb.xls")
+DEFAULT_OUTPUT_DIR = Path("outputs/legacy-python")
+
+
+def display_dist(df, label, output_dir):
     # TODO: separate label from title argument to allow customization
     """takes a df and a column label and graphs the distribution (continuous) for display"""
 
@@ -20,8 +30,7 @@ def display_dist(df, label):
     fig, axes = plt.subplots(2, 1, figsize=(6, 6))
     axes[1].set_aspect(aspect=1)
 
-    # TODO: switch this to displot
-    sns.distplot(df[label], ax=axes[0], kde=False, norm_hist=False, color='teal')
+    sns.histplot(df[label].dropna(), ax=axes[0], color='teal')
     sns.boxplot(data=df, x=label, ax=axes[1], color='skyblue')
 
     sns.despine(ax=axes[0], top=True, bottom=True, right=True)
@@ -36,16 +45,16 @@ def display_dist(df, label):
                 count=df[label].describe()['count'])
 
     axes[1].set_xlabel(row_label, fontsize='large')
-    axes[1].get_shared_x_axes().join(axes[1], axes[0])
+    axes[0].set_xlim(axes[1].get_xlim())
     axes[1].set(xlim=(0, None))
 
     fig.suptitle("Distribution of: " + str(label), fontsize='xx-large')
     fig.tight_layout(rect=[0, 0, 1, .9])  # .95 to leave space for title
-    fig.savefig('dist figs/Display Dist ' + str(label) + '.png', dpi=100)
+    fig.savefig(output_dir / ('Display Dist ' + str(label) + '.png'), dpi=100)
     plt.close()
 
 
-def display_cats(df, label):
+def display_cats(df, label, output_dir):
     # TODO: separate label from title argument to allow customization
     """takes a df and a column label and graphs the counts of categories for display"""
     sns.set(style="white", palette="cubehelix")
@@ -61,7 +70,7 @@ def display_cats(df, label):
 
     fig.suptitle("Distribution of: " + str(label), fontsize='xx-large')
     # fig.tight_layout(rect=[0, 0, 1, .9])  # .95 to leave space for title
-    fig.savefig('dist figs/Display Cat ' + str(label) + '.png', dpi=100)
+    fig.savefig(output_dir / ('Display Cat ' + str(label) + '.png'), dpi=100)
     plt.close()
 
 
@@ -186,7 +195,7 @@ def file_to_df(location):
     return db
 
 
-def make_tables(db):
+def make_tables(db, output_dir):
     """creates tables and exports to excel"""
 
     #Subgroups: current decision maker (patient vs surrogate/polst) - stratified by patient vs other decision-maker
@@ -816,7 +825,7 @@ def make_tables(db):
 
     # TODO: add final code status / ACP info
 
-    workbook.save("tables.xlsx")
+    workbook.save(output_dir / "tables.xlsx")
     return
 
 
@@ -850,7 +859,7 @@ def count_string_indiv(num, num_patients):
     """returns an string with the number and percentage of an individuals value"""
     output = "%.0f/" % num
     output += str(num_patients)
-    if num_patients is not 0:
+    if num_patients != 0:
         percentage = (num / num_patients) * 100
     else:
         percentage = 0.0
@@ -997,7 +1006,7 @@ def statistical_tests(df):
     return
 
 
-def code_status_alluvial(df):
+def code_status_alluvial(df, output_dir):
     """takes the df and creates a sankey diagram (alluvial - with time points oriented vertically) to show change in
     code status at 3 time points:
 
@@ -1030,95 +1039,133 @@ def code_status_alluvial(df):
     )])
 
     fig.update_layout(font_size=25)
-    fig.show()
+    fig.write_html(output_dir / "code_status_alluvial.html")
 
 
-def visualizations(db):
+def visualizations(db, figures_dir):
     """takes the database, creates visualizations of the data"""
-    display_dist(db, 'Age')
-    display_cats(db, 'Gender')
-    display_dist(db, 'BMI')
-    display_cats(db, 'Ethnicity')
-    display_cats(db, 'Death')
-    display_cats(db, 'Oxygen Delivery')
-    display_cats(db, 'Setting')
-    display_cats(db, 'New Discharge O2')
-    display_dist(db, 'LOS')
-    display_cats(db, 'Palliative Consult')
-    display_dist(db, 'CCI')
-    display_cats(db, 'Prior ACP type')
-    display_cats(db, 'Prior Decision Maker')
-    display_cats(db, 'Prior Code status')
-    display_cats(db, 'Prior limitations on artificial nutrition')
-    display_cats(db, 'Prior limitations on intubation')
-    display_cats(db, 'Prior limitations of ICU transfer')
-    display_cats(db, 'Ok for IV fluids or antibiotics')
-    display_cats(db, 'Prior limitations of ICU transfer')
-    display_cats(db, 'Ok for long term nutrition or intubation')
-    display_cats(db, 'Prior Comfort care')
-    display_cats(db, 'Hospitalization ACP')
-    display_cats(db, 'Current Decision Maker')
-    display_cats(db, 'Change from prior decision maker')
-    display_cats(db, 'Code Status At Hospitalization')
-    display_cats(db, 'Comfort care')
-    display_cats(db, 'ICU transfer acceptable to patient?')
-    display_cats(db, 'Change in code status from prior ACP on admission')
-    display_cats(db, 'Direct of Change in code status on admit')
-    display_cats(db, 'Subsequent changes during hospitalization')
+    display_dist(db, 'Age', figures_dir)
+    display_cats(db, 'Gender', figures_dir)
+    display_dist(db, 'BMI', figures_dir)
+    display_cats(db, 'Ethnicity', figures_dir)
+    display_cats(db, 'Death', figures_dir)
+    display_cats(db, 'Oxygen Delivery', figures_dir)
+    display_cats(db, 'Setting', figures_dir)
+    display_cats(db, 'New Discharge O2', figures_dir)
+    display_dist(db, 'LOS', figures_dir)
+    display_cats(db, 'Palliative Consult', figures_dir)
+    display_dist(db, 'CCI', figures_dir)
+    display_cats(db, 'Prior ACP type', figures_dir)
+    display_cats(db, 'Prior Decision Maker', figures_dir)
+    display_cats(db, 'Prior Code status', figures_dir)
+    display_cats(db, 'Prior limitations on artificial nutrition', figures_dir)
+    display_cats(db, 'Prior limitations on intubation', figures_dir)
+    display_cats(db, 'Prior limitations of ICU transfer', figures_dir)
+    display_cats(db, 'Ok for IV fluids or antibiotics', figures_dir)
+    display_cats(db, 'Prior limitations of ICU transfer', figures_dir)
+    display_cats(db, 'Ok for long term nutrition or intubation', figures_dir)
+    display_cats(db, 'Prior Comfort care', figures_dir)
+    display_cats(db, 'Hospitalization ACP', figures_dir)
+    display_cats(db, 'Current Decision Maker', figures_dir)
+    display_cats(db, 'Change from prior decision maker', figures_dir)
+    display_cats(db, 'Code Status At Hospitalization', figures_dir)
+    display_cats(db, 'Comfort care', figures_dir)
+    display_cats(db, 'ICU transfer acceptable to patient?', figures_dir)
+    display_cats(db, 'Change in code status from prior ACP on admission', figures_dir)
+    display_cats(db, 'Direct of Change in code status on admit', figures_dir)
+    display_cats(db, 'Subsequent changes during hospitalization', figures_dir)
 
-    display_cats(db, 'Symptoms prior to admit')
-    display_cats(db, 'Fever')
-    display_cats(db, 'SOB')
-    display_cats(db, 'Sinus Congestion')
-    display_cats(db, 'Malaise or Fatigue or Weakness')
-    display_cats(db, 'Diarrhea')
-    display_cats(db, 'Confusion')
-    display_cats(db, 'Anorexia')
-    display_cats(db, 'Myalgias Athralgias')
-    display_cats(db, 'HA')
-    display_cats(db, 'Sore throat')
-    display_cats(db, 'Abdominal pain')
-    display_cats(db, 'SIRS criteria met on admission')
+    display_cats(db, 'Symptoms prior to admit', figures_dir)
+    display_cats(db, 'Fever', figures_dir)
+    display_cats(db, 'SOB', figures_dir)
+    display_cats(db, 'Sinus Congestion', figures_dir)
+    display_cats(db, 'Malaise or Fatigue or Weakness', figures_dir)
+    display_cats(db, 'Diarrhea', figures_dir)
+    display_cats(db, 'Confusion', figures_dir)
+    display_cats(db, 'Anorexia', figures_dir)
+    display_cats(db, 'Myalgias Athralgias', figures_dir)
+    display_cats(db, 'HA', figures_dir)
+    display_cats(db, 'Sore throat', figures_dir)
+    display_cats(db, 'Abdominal pain', figures_dir)
+    display_cats(db, 'SIRS criteria met on admission', figures_dir)
 
-    display_dist(db, 'Temp')
-    display_dist(db, 'SBP')
-    display_dist(db, 'DBP')
-    display_dist(db, 'Pulse')
-    display_dist(db, 'RR')
-    display_dist(db, 'O2')
-    display_dist(db, 'WBC')
-    display_dist(db, 'SIRS criteria met')
-    display_dist(db, 'Supp O2')
-    display_dist(db, 'Age')
-    display_dist(db, 'Days after admit test positive')
+    display_dist(db, 'Temp', figures_dir)
+    display_dist(db, 'SBP', figures_dir)
+    display_dist(db, 'DBP', figures_dir)
+    display_dist(db, 'Pulse', figures_dir)
+    display_dist(db, 'RR', figures_dir)
+    display_dist(db, 'O2', figures_dir)
+    display_dist(db, 'WBC', figures_dir)
+    display_dist(db, 'SIRS criteria met', figures_dir)
+    display_dist(db, 'Supp O2', figures_dir)
+    display_dist(db, 'Age', figures_dir)
+    display_dist(db, 'Days after admit test positive', figures_dir)
 
-    display_cats(db, 'MI')
-    display_cats(db, 'CHF')
-    display_cats(db, 'PVD')
-    display_cats(db, 'CVA or TIA')
-    display_cats(db, 'Dementia')
-    display_cats(db, 'COPD')
-    display_cats(db, 'Connective tissue disease')
-    display_cats(db, 'PUD')
-    display_cats(db, 'Liver disease')
-    display_cats(db, 'DM')
-    display_cats(db, 'Mod-Sev CKD')
-    display_cats(db, 'Solid tumor')
-    display_cats(db, 'Leukemia')
-    display_cats(db, 'Lymphoma')
-    display_cats(db, 'AIDS')
-    display_cats(db, 'Hemiplegia')
+    display_cats(db, 'MI', figures_dir)
+    display_cats(db, 'CHF', figures_dir)
+    display_cats(db, 'PVD', figures_dir)
+    display_cats(db, 'CVA or TIA', figures_dir)
+    display_cats(db, 'Dementia', figures_dir)
+    display_cats(db, 'COPD', figures_dir)
+    display_cats(db, 'Connective tissue disease', figures_dir)
+    display_cats(db, 'PUD', figures_dir)
+    display_cats(db, 'Liver disease', figures_dir)
+    display_cats(db, 'DM', figures_dir)
+    display_cats(db, 'Mod-Sev CKD', figures_dir)
+    display_cats(db, 'Solid tumor', figures_dir)
+    display_cats(db, 'Leukemia', figures_dir)
+    display_cats(db, 'Lymphoma', figures_dir)
+    display_cats(db, 'AIDS', figures_dir)
+    display_cats(db, 'Hemiplegia', figures_dir)
 
 
-def main():
-    db_loc = "/Users/reblocke/Box/Residency Personal Files/Scholarly Work/SVH COVID Outbreak/Database/WorkingDb.xls"
-    db = file_to_df(db_loc)
-    statistical_tests(db)
-    db.to_excel('output.xlsx')
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Run the legacy StateVetsHome COVID goals-of-care analysis."
+    )
+    parser.add_argument(
+        "--input",
+        default=DEFAULT_INPUT,
+        type=Path,
+        help="Path to the local restricted WorkingDb.xls workbook.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=DEFAULT_OUTPUT_DIR,
+        type=Path,
+        help="Directory for generated tables, figures, and logs.",
+    )
+    return parser.parse_args(argv)
 
-    make_tables(db)
-    visualizations(db)
-    code_status_alluvial(db)
+
+def run_analysis(input_path, output_dir):
+    input_path = Path(input_path)
+    output_dir = Path(output_dir)
+    figures_dir = output_dir / "figures"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    if not input_path.exists():
+        raise FileNotFoundError(
+            "Missing restricted workbook: "
+            f"{input_path}. Supply a local compatible workbook with --input."
+        )
+
+    db = file_to_df(input_path)
+    with open(output_dir / "statistical_tests.txt", "w", encoding="utf-8") as stats_log:
+        with redirect_stdout(stats_log):
+            statistical_tests(db)
+    db.to_excel(output_dir / "output.xlsx")
+
+    make_tables(db, output_dir)
+    visualizations(db, figures_dir)
+    code_status_alluvial(db, output_dir)
+    return db
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    run_analysis(args.input, args.output_dir)
 
     # Hypotheses? Statistical tests?
 

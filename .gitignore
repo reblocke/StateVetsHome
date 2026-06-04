@@ -1,0 +1,38 @@
+# OS/editor artifacts
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+~$*
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Restricted/local clinical data
+data/
+Data/
+WorkingDb.xls
+WorkingDb.xlsx
+*.dta
+*.xls
+*.xlsx
+*.xlsm
+!tests/fixtures/
+!tests/fixtures/synthetic_svh_workbook.xlsx
+
+# Generated outputs
+outputs/
+dist figs/
+tables.xlsx
+output.xlsx
+statistical_tests.txt
+code_status_alluvial.html
+*.log

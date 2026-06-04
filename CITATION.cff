@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this repository, please cite it using this metadata."
+title: "StateVetsHome: Legacy Python analysis for COVID-19 goals-of-care decisions in a state veterans home cohort"
+type: software
+authors:
+  - family-names: Locke
+    given-names: Brian W.
+    orcid: "https://orcid.org/0000-0002-3588-5238"
+repository-code: "https://github.com/reblocke/StateVetsHome"
+url: "https://github.com/reblocke/StateVetsHome"
+license: MIT
+abstract: "Legacy Python workflow for summarizing a restricted COVID-19 goals-of-care cohort from a state veterans home outbreak. No verifiable abstract DOI was recovered during the 2026-06-04 cleanup pass."
+keywords:
+  - COVID-19
+  - goals of care
+  - advance care planning
+  - state veterans home
+  - clinical research
+  - Python

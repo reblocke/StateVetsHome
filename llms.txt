@@ -1,0 +1,21 @@
+# StateVetsHome
+
+Repository: https://github.com/reblocke/StateVetsHome
+
+Purpose: Legacy Python analysis for COVID-19 goals-of-care decisions in a state veterans home cohort. The workflow summarizes admission characteristics, advance-care-planning variables, patient-versus-surrogate decision-maker groups, code-status transitions, hospitalization course, and generated aggregate figures/tables.
+
+Status: Abstract-only legacy repository. No verifiable abstract DOI or indexed abstract record was recovered from current public repository, CV, or website materials during the 2026-06-04 cleanup. Until a public record is supplied, cite the repository software via `CITATION.cff`.
+
+Canonical command:
+
+```bash
+python SVH.py --input data/private/WorkingDb.xls --output-dir outputs/legacy-python
+```
+
+Expected input: `data/private/WorkingDb.xls`, a restricted local workbook with row-level clinical/goals-of-care data. Do not commit this workbook, derived row-level exports, PHI, private drafts, or local Box paths.
+
+Generated outputs: `output.xlsx`, `tables.xlsx`, `statistical_tests.txt`, `code_status_alluvial.html`, and `figures/*.png` under the selected output directory. Historical aggregate outputs formerly tracked in `dist figs/` and `tables.xlsx` were archived in release `legacy-covid-goc-outputs-2026-06-04`.
+
+Machine-readable files: `README.md`, `CITATION.cff`, `AGENTS.md`, `data_dictionary.md`, `data_dictionary.csv`, `REPRODUCING.md`, `requirements.txt`, and `requirements-dev.txt`.
+
+Agent cautions: Preserve restricted-data boundaries. Do not infer publication metadata. If an abstract DOI is later verified, add it to the docs and CFF rather than copying publisher text. Keep the legacy analysis logic stable unless a separate scientific refactor is requested.

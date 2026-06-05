@@ -1,0 +1,7 @@
+pandas
+openpyxl
+xlrd
+matplotlib
+seaborn
+scipy
+plotly

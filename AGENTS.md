@@ -29,8 +29,7 @@ Generated tables, logs, figures, and alluvial HTML belong under ignored `outputs
 - Use synthetic or de-identified fixtures only for tests.
 
 ## Verification
-
-Before publishing changes, run:
+For documentation-only edits, check affected references and `git diff --check`. For analysis-code or input-contract changes, run the tests and synthetic smoke below; they do not establish restricted-data reproduction. Use a fresh smoke output directory if the example destination already contains work.
 
 ```bash
 python -m pytest
